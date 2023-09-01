@@ -1,5 +1,4 @@
 ---
-
 name: sim_env
 
 topology:
@@ -13,10 +12,15 @@ topology:
     session_1:
       kind: linux
       image: tharpie:0.1
-      cmd: /usr/bin/bash services.sh
+      cmd: /usr/bin/bash start_ssh.sh
+    host_1:
+      kind: linux
+      image: tharpie:0.1
+      cmd: /usr/bin/bash start_ssh.sh
 
-#  links:
-#    - endpoints: ["srl1:e1-1", "ceos1:eth1"]
+
+  links:
+    - endpoints: ["session_1:eth1", "host_1:eth1"]
 #    - endpoints: ["srl1:e1-2", "ceos1:eth2"]
 #    - endpoints: ["srl1:e1-3", "ceos1:eth3"]
 #    - endpoints: ["srl1:e1-5", "ceos1:eth5"]
