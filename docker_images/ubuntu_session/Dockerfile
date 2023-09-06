@@ -1,14 +1,14 @@
 FROM ubuntu:22.04
 
-RUN apt-get update && apt-get -y install openssh-server sudo
-RUN apt-get install -y iproute2
-RUN apt-get install -y net-tools
-RUN apt-get install -y python3.10
+RUN apt-get update && apt-get -y install openssh-server sudo iproute2 net-tools python3.10
 RUN service ssh start
-EXPOSE 22
-RUN useradd -rm -d /home/ubuntu -s /bin/bash -g root -G sudo -u 1000 admin 
+RUN useradd --system --create-home --home-dir /home/admin --shell /bin/bash \
+            --gid admin --groups sudo --uid 1000 admin
+
+RUN mkdir --mode 600 -p /home/admin/.ssh
 RUN echo 'admin:admin' | chpasswd
-COPY start_ssh.sh .
-COPY sleep.py .
-RUN chmod +x start_ssh.sh sleep.py
-RUN chown 777 start_ssh.sh sleep.py
+
+WORKDIR /home/admin
+ADD --chown admin:admin --chmod=770 exec/* /home/admin/
+
+EXPOSE 22

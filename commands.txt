@@ -1,0 +1,22 @@
+## Useful commnands to understand what is going on
+
+# view all the created netns for each device
+$ ls -latrh /var/run/netns
+$ ip netns list
+
+# veth information
+# every veth is a pair, every device in containerlab has a netns
+# veth ties together each interface in a netns
+
+$ sudo ip netns exec <netns name> ip link show type veth
+
+# setup ansible 2.10.8
+$ sudo apt-get -y install ansible
+
+# setup user admin on local machine
+$ sudo useradd --system --create-home --home-dir /home/admin --shell /bin/bash --gid root --groups sudo --uid 1001 admin
+$ echo 'admin:PLEASEINSERTASTRONGPASSWORD' | sudo chpasswd
+$ sudo su admin
+$ ssh-keygen -t rsa -b 4096
+
+

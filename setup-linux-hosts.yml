@@ -1,0 +1,11 @@
+---
+
+- name: setup linux hosts
+  hosts: linux
+  remote_user: admin
+
+  tasks:
+  - name: discover admin user working directory
+    ansible.builtin.command: /usr/bin/echo $HOME
+    register: home_directory
+
