@@ -5,7 +5,44 @@
   remote_user: admin
 
   tasks:
-  - name: discover admin user working directory
+  - name: discover {{ ansible_user }} user working directory
     ansible.builtin.command: /usr/bin/echo $HOME
-    register: home_directory
+    register: echo_home_response
+
+  - name: set_fact for home_dir
+    ansible.builtin.set_fact:
+      home_dir: "{{ echo_home_response.stdout_lines[0] }}"
+
+  - name: debug home_dir variable
+    debug:
+      var: home_dir
+      
+  - name: create /tmp/{{ ansible_user }} directory
+    local_action:
+      module: ansible.builtin.file
+      path: "/tmp/{{ ansible_user }}"
+      state: directory
+    run_once: true
+
+  - name: generate keypair for admin user
+    local_action:
+      module: community.crypto.openssh_keypair
+      path: "/tmp/{{ ansible_user }}/id_ssh_rsa"
+    run_once: true
+
+  - name: copy /tmp/{{ ansible_user }}/id_ssh_rsa.pub to hosts
+    ansible.builtin.copy:
+      src: "/tmp/{{ ansible_user }}/id_ssh_rsa.pub"
+      dest: "/home/{{ ansible_user }}/.ssh/id_ssh_rsa.pub"
+      owner: "{{ ansible_user }}"
+      group: root
+      mode: '0600'
+
+  - name: copy /tmp/{{ ansible_user }}/id_ssh_rsa.pub to authorized_keys
+    ansible.builtin.copy:
+      src: "/tmp/{{ ansible_user }}/id_ssh_rsa.pub"
+      dest: "/home/{{ ansible_user }}/.ssh/authorized_keys"
+      owner: "{{ ansible_user }}"
+      group: root
+
 
