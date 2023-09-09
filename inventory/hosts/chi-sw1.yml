@@ -1,0 +1,44 @@
+---
+
+extra_groups: ['exchange', 'multicast']
+
+kind: eos
+hw_model: 7010t
+spt_mode: rapid-pvst
+
+net_details:
+  unicast:
+    routing: true
+    ipv4_subnets:
+      - { net: 10.200.1.0/24, vlan: 200 }
+
+    bgp:
+      asn: 65000
+      neighbors:
+        chi1-sw2:
+          peer_asn: 65003
+          peer_ipv4: 10.100.100.1/30
+          local_ipv4: 10.100.100.2/30
+
+  multicast:
+    ipv4_rdvp:
+      - { rdvp: 10.200.255.1 }
+      - { rdvp: 10.200.255.1, net: 239.1.0.0/24 }
+
+interfaces:
+  eth1:
+    type: access
+    vlan: 200
+
+  eth2:
+  eth3:
+  eth4:
+    type: routed
+    protocols:
+      bgp:
+        neighbor: chi1-sw2
+      pim: sparse
+
+  eth49/1:
+    type: cross_connect
+    xconnect_id: xconn_abc

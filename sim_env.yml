@@ -3,12 +3,9 @@ name: sim_env
 
 topology:
   nodes:
-#    xconn_abc:
-#      kind: ceos
-#      image: ceos:4.30.2F
-#    hou-sw1:
-#      kind: ceos
-#      image: ceos:4.30.2F
+    xconn_abc:
+      kind: ceos
+      image: ceos:4.30.2F
     session_1:
       kind: linux
       image: tharpie:0.1

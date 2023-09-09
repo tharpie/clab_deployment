@@ -1,13 +1,20 @@
 
 global:
   namerica:
+    il:
+      chicago:
+        hostnames:
+        - chi-sw1
     tx:
       houston:
+        hostnames:
         - hou-sw1
-        - hou-sw2
-#    il:
-#      chicago:
-#        - chi-sw1
-#        - chi-sw2
-  
+  europe:
+    france:
+      paris:
+        hostnames:
+        - paris-sw1
+
+
+
 
