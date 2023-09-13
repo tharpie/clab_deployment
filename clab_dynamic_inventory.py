@@ -12,7 +12,7 @@ inv.load()
 print()
 
 for k,v in inv.groups.items():
-  print(k, v.children, v.variables, v.hosts)
+  print(k, v.children, v.variables, v.hosts())
   print(json.dumps(v.merged_vars, indent=2))
 
 print()
@@ -24,3 +24,6 @@ for k,v in inv.hosts.items():
   print(json.dumps(v.merged_vars, indent=2))
 
 print()
+
+for item in inv.ordered_groups:
+  print(item)

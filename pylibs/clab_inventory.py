@@ -18,6 +18,32 @@ def pretty_execption(class_name, func_name, tb, e):
     sys.exit(1)
 
 
+class InventoryGroup(object):
+    def __init__(self, name):
+        self.name = name
+        self.children = list()
+        self.hashed_hosts = dict()
+        self.variables = dict()
+        self.merged_vars = dict()
+
+    def hosts(self):
+        return(list(self.hashed_hosts.keys()))
+   
+    
+class InventoryHost(object):
+    def __init__(self, name):
+        self.name = name
+        self.ordered_groups = dict()
+        self.variables = dict()
+        self.merged_vars = dict()
+
+    def groups(self):
+        groups = list()
+        for k,v in sorted(self.ordered_groups.items()):
+            groups.append(v)
+        return(groups)  
+
+
 class Inventory(object):
     def __init__(self, inventory_fname):
         self.inventory_fname = inventory_fname
@@ -25,7 +51,7 @@ class Inventory(object):
         self.hosts = dict()
         self.inventory_yaml = dict()
         self.inventory_basedir = self.inventory_fname[:self.inventory_fname.rfind('/')]
-
+        self.ordered_groups = list()
     
     def load(self):        
         self.__read_inventory_file()
@@ -54,6 +80,7 @@ class Inventory(object):
                 if 'hostnames' in v.keys():
                     parent_group = groups[tier-1]
                     self.groups[parent_group].children.append(k)
+                    self.ordered_groups.append(k)
                     
                     for host in v['hostnames']:
                         h = InventoryHost(host)
@@ -62,24 +89,24 @@ class Inventory(object):
                         self.hosts[h.name] = h
 
                         for order,group_name in sorted(h.ordered_groups.items()):
-                            self.groups[group_name].hosts.append(host)
-                
+                            self.groups[group_name].hashed_hosts[host] = None                
                 else:
                     if tier > 0:
                         parent_group = groups[tier-1]
                         self.groups[parent_group].children.append(k)
                     
+                    self.ordered_groups.append(k)
                     _groups = copy.deepcopy(groups)
                     _tier = copy.deepcopy(tier)
                     _groups.update({tier:k})
                     _tier += 1
                     self.__create_inventory_objects(v, _groups, _tier)
             
-            try:
-                g
-            except Exception as e:
-                tb = traceback.format_exc()
-                pretty_exception(self.__name__, self.__create_inventory_objects.__name__, tb, e)
+            #try:
+            #    g
+            #except Exception as e:
+            #    tb = traceback.format_exc()
+            #    pretty_exception(self.__name__, self.__create_inventory_objects.__name__, tb, e)
             
 
     def __load_variables(self):
@@ -99,12 +126,9 @@ class Inventory(object):
 
                     if 'extra_groups' in yaml_vars.keys():
                         extra_indices = [ i + len(self.hosts[k].ordered_groups.keys()) for i in range(0,len(yaml_vars['extra_groups']))]
-                        print(v.ordered_groups)
-                        print(yaml_vars['extra_groups'])
-                        print(extra_indices)
                         for group_name in yaml_vars['extra_groups']:
                             g = InventoryGroup(group_name)
-                            g.hosts.append(k)
+                            g.hashed_hosts[k] = None
                             self.groups[group_name] = g
                             self.hosts[k].ordered_groups.update({extra_indices.pop(0):group_name})
                 
@@ -123,7 +147,6 @@ class Inventory(object):
         
         for k,v in self.groups.items():
             if k in group_files:
-                print(k, group_files[k])
                 with open(f'{self.inventory_basedir}/groups/{group_files[k]}') as y:
                     yaml_vars = yaml.safe_load(y)
                     v.variables.update(yaml_vars)
@@ -149,16 +172,16 @@ class Inventory(object):
         return(variables)
 
     def __merge_group_vars(self):
-        for k,v in self.groups.items():
-            merged_vars = copy.deepcopy(v.merged_vars)
+        for group_name in self.ordered_groups:
+            g = self.groups[group_name]
+            merged_vars = copy.deepcopy(g.merged_vars)
 
-            if len(v.children) > 0:
-                for c in v.children:
-                    if c in self.groups.keys():
-                        child_merged_vars = self.__merge_variables(merged_vars, copy.deepcopy(self.groups[c].merged_vars))
-                        self.groups[c].merged_vars = child_merged_vars
+            if len(g.children) > 0:
+                for c in g.children:
+                    child_merged_vars = self.__merge_variables(merged_vars, copy.deepcopy(self.groups[c].merged_vars))
+                    self.groups[c].merged_vars = child_merged_vars
 
-            v.merged_vars = merged_vars
+            g.merged_vars = merged_vars
 
     def __merge_host_vars(self):
         for k,v in self.hosts.items():
@@ -171,27 +194,7 @@ class Inventory(object):
             v.merged_vars = host_vars            
 
 
-class InventoryGroup(object):
-    def __init__(self, name):
-        self.name = name
-        self.hosts = list()
-        self.children = list()
-        self.variables = dict()
-        self.merged_vars = dict()
-
-
-class InventoryHost(object):
-    def __init__(self, name):
-        self.name = name
-        self.ordered_groups = dict()
-        self.variables = dict()
-        self.merged_vars = dict()
-
-    def groups(self):
-        groups = list()
-        for k,v in sorted(self.ordered_groups.items()):
-            groups.append(v)
-        return(groups)    
+  
 
 '''
 {
