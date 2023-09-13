@@ -1,0 +1,8 @@
+---
+
+
+extra_groups: ['core', 'multicast']
+
+kind: eos
+hw_model: 7050SX
+spt_mode: rapid-pvst
