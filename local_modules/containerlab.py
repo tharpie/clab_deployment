@@ -57,6 +57,11 @@ from ansible.module_utils.basic import AnsibleModule
 def run_module():
     # define available arguments/parameters a user can pass to the module
     import os
+    import sys
+    sys.path.append( sys.os.environ['CONTAINERLAB_PYTHON_LIBS'] )
+
+    import clab_inventory
+
     cwd = os.getcwd()
     dest_path = f'{cwd}/clab-deployment-topology.yml'
 

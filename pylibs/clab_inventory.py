@@ -4,7 +4,7 @@ import sys
 import yaml
 import traceback
 import copy
-
+import keyword
 
 def pretty_execption(class_name, func_name, tb, e):
     print(f'Exception caught:  in class={class_name} func={func_name}')
@@ -17,17 +17,58 @@ def pretty_execption(class_name, func_name, tb, e):
     print()
     sys.exit(1)
 
+#raise Exception(f'{self.name} is in python keyword list or has invalid character or star')
+
+def is_name_valid(name):
+    valid = True
+    if type(name) != str:
+        valid = False
+    elif name in keyword.kwlist:
+        valid = False            
+    elif '.' in name:
+        valid = False
+    elif ' ' in name:
+        valid = False
+    elif '-' in name:
+        valid = False
+    elif name.isnumeric():
+        valid = False
+    elif name[0].isnumeric():
+        valid = False
+    
+    return(valid)
+
 
 class InventoryGroup(object):
     def __init__(self, name):
         self.name = name
-        self.children = list()
-        self.hashed_hosts = dict()
+        if not self._is_valid():
+            raise Exception(f'{name} has invalid InventoryGroup name')
+
+        self.set_children = set()
+        self.set_hosts = set()
+        self.hosts = self._hosts
+        self.children = self._children
         self.variables = dict()
         self.merged_vars = dict()
 
-    def hosts(self):
-        return(list(self.hashed_hosts.keys()))
+    def _is_valid(self):
+        return(is_name_valid(self.name))
+
+    def _add_child(self, child):
+        self.set_children.add(child)
+        return()
+    
+    def _add_host(self, host):
+        self.set_hosts.add(host)
+        return()
+    
+    def _hosts(self):
+        return(list(sorted(self.set_hosts)))
+
+    def _children(self):
+        return(list(sorted(self.set_children)))
+
    
     
 class InventoryHost(object):
@@ -191,10 +232,26 @@ class Inventory(object):
                 host_vars.update(self.__merge_variables(host_vars, copy.deepcopy(self.groups[g].merged_vars)))
                 
             host_vars.update(self.__merge_variables(copy.deepcopy(v.merged_vars), copy.deepcopy(self.groups[g].merged_vars)))
-            v.merged_vars = host_vars            
+            v.merged_vars = host_vars
 
+    def ansible_inventory(self):
+        ansible_vars = dict()
+        ansible_vars['_meta'] = dict()
+        ansible_vars['_meta']['hostvars'] = dict()
+ 
+        for k,v in self.groups.items():
+            group = dict()
+            group.update({'children': v.children})
+            group.update({'vars': v.merged_vars})
+            group.update({'hosts': v.hosts()})
+            ansible_vars.update({k:group})
 
-  
+        for k,v in self.hosts.items():
+            host = dict()
+            host.update(v.merged_vars)
+            ansible_vars['_meta']['hostvars'].update({k:host})
+
+        return(ansible_vars)
 
 '''
 {

@@ -27,3 +27,8 @@ print()
 
 for item in inv.ordered_groups:
   print(item)
+
+
+print('#########################################')
+print(json.dumps(inv.ansible_inventory(), indent=2))
+
