@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# project based things to ignore
+*clab*
+
 # C extensions
 *.so
 
