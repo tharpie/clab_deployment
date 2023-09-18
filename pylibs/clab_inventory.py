@@ -74,11 +74,17 @@ class InventoryGroup(object):
 class InventoryHost(object):
     def __init__(self, name):
         self.name = name
+        self.groups = self._groups
         self.ordered_groups = dict()
         self.variables = dict()
         self.merged_vars = dict()
 
-    def groups(self):
+    def _add_group(self, group_name):
+        index = len(self.ordered_groups)
+        self.ordered_groups[index] = group_name
+        return()
+
+    def _groups(self):
         groups = list()
         for k,v in sorted(self.ordered_groups.items()):
             groups.append(v)

@@ -4,7 +4,20 @@ sys.path.append(f'{os.getcwd()}/pylibs')
 import clab_inventory
 
 
-class InventoryGroupLibrary(object):
+class InventoryHost(object):
+    def __init__(self, name):
+        self.name = name
+        self.ordered_groups = dict()
+        self.variables = dict()
+        self.merged_vars = dict()
+
+    def groups(self):
+        groups = list()
+        for k,v in sorted(self.ordered_groups.items()):
+            groups.append(v)
+        return(groups)  
+
+class InventoryHostLibrary(object):
     """Test library for testing InventoryGroup logic.
 
     Interacts with InventoryGroup object using its method(s).
@@ -45,3 +58,6 @@ class InventoryGroupLibrary(object):
         hosts = ','.join(self._group.hosts())
         if expected != hosts:
             raise AssertionError(f'{expected} != {hosts}')
+
+   
+    
