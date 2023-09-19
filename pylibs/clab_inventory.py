@@ -5,6 +5,8 @@ import yaml
 import traceback
 import copy
 import keyword
+import json
+from robot.utils.dotdict import DotDict
 
 def pretty_execption(class_name, func_name, tb, e):
     print(f'Exception caught:  in class={class_name} func={func_name}')
@@ -18,6 +20,8 @@ def pretty_execption(class_name, func_name, tb, e):
     sys.exit(1)
 
 #raise Exception(f'{self.name} is in python keyword list or has invalid character or star')
+
+SUPPORTED_VAR_TYPES = ['dict', 'file_name', 'url']
 
 def is_name_valid(name):
     valid = True
@@ -38,6 +42,37 @@ def is_name_valid(name):
     
     return(valid)
 
+def merge_variables(orig, update=dict()):
+    variables = copy.deepcopy(orig)
+
+    for u_k, u_v in update.items():
+        if u_k not in orig.keys():
+            variables.update({u_k:u_v})
+        else:
+            if type(u_v) == str:
+                variables[u_k] = u_v
+            elif type(u_v) == list:
+                for item in u_v:
+                    if item not in variables[u_k]:
+                        variables[u_k].append(item)
+            elif type(u_v) == dict or isinstance(u_v, DotDict):
+                variables[u_k] = merge_variables(variables[u_k], u_v)
+    
+    return(variables)
+
+def load_variables(variables, var_type):
+    _vars = dict()
+    if var_type not in SUPPORTED_VAR_TYPES:
+        raise Exception(f'{var_type} is not supported. Specify one of the following {str(SUPPORTED_VAR_TYPES)}')
+    else:
+        if var_type == 'dict':
+            _vars.update(variables)
+        elif var_type == 'file_name':
+            with open(variables) as f:
+                v = yaml.safe_load(f)
+                _vars.update(v)
+    
+    return(_vars)
 
 class InventoryGroup(object):
     def __init__(self, name):
@@ -50,7 +85,7 @@ class InventoryGroup(object):
         self.hosts = self._hosts
         self.children = self._children
         self.variables = dict()
-        self.merged_vars = dict()
+        self._vars = dict()
 
     def _is_valid(self):
         return(is_name_valid(self.name))
@@ -69,7 +104,14 @@ class InventoryGroup(object):
     def _children(self):
         return(list(sorted(self.set_children)))
 
-   
+    def _load_variables(self, variables, var_type):
+        self._vars = load_variables(variables, var_type)
+        self.variables = copy.deepcopy(self._vars)
+
+    def _merge_vars(self, update=dict()):
+        merged = merge_variables(self.variables, update)
+        self.variables = merged
+
     
 class InventoryHost(object):
     def __init__(self, name):
