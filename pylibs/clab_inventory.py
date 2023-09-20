@@ -93,11 +93,21 @@ class InventoryGroup(object):
     def _add_child(self, child):
         self.set_children.add(child)
         return()
-    
+
+    def _add_children(self, children):
+        for c in list(children):
+            self._add_child(c)        
+        return()
+
     def _add_host(self, host):
         self.set_hosts.add(host)
         return()
-    
+
+    def _add_hosts(self, hosts):
+        for h in list(hosts):
+            self._add_host(h)
+        return()
+
     def _hosts(self):
         return(list(sorted(self.set_hosts)))
 
@@ -119,11 +129,16 @@ class InventoryHost(object):
         self.groups = self._groups
         self.ordered_groups = dict()
         self.variables = dict()
-        self.merged_vars = dict()
+        self._vars = dict()
 
     def _add_group(self, group_name):
         index = len(self.ordered_groups)
         self.ordered_groups[index] = group_name
+        return()
+
+    def _add_groups(self, groups):
+        for g in list(groups):
+            self._add_group(g)
         return()
 
     def _groups(self):
@@ -131,6 +146,14 @@ class InventoryHost(object):
         for k,v in sorted(self.ordered_groups.items()):
             groups.append(v)
         return(groups)  
+
+    def _load_variables(self, variables, var_type):
+        self._vars = load_variables(variables, var_type)
+        self.variables = copy.deepcopy(self._vars)
+
+    def _merge_vars(self, update=dict()):
+        merged = merge_variables(self.variables, update)
+        self.variables = merged
 
 
 class Inventory(object):
