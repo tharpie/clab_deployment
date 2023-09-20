@@ -1,0 +1,15 @@
+---
+
+sessions:
+  session_a:
+    ip: 1.1.1.1
+    port: '5000'
+    transport: tcp
+  session_b:
+    ip: 2.2.2.2
+    port: '5000'
+    transport: tcp
+  session_c:
+    ip: 3.3.3.3
+    port: '5000'
+    transport: tcp

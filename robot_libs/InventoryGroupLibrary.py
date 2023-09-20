@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import deepdiff
 sys.path.append(f'{os.getcwd()}/pylibs')
 import clab_inventory
 
@@ -75,6 +76,8 @@ class InventoryGroupLibrary(object):
             raise AssertionError(f'{self._group.name} != {expected}')
 
     def set_variables(self, variables, var_type):
+        if var_type == 'file_name':
+            variables = os.path.realpath(f'{os.getcwd()}/{variables}')
         self._group._load_variables(variables, var_type)
 
     def merge_variables(self, update_vars):
@@ -96,6 +99,5 @@ class InventoryGroupLibrary(object):
         e = expected
         v = self._group.variables
         if e != v:
-            raise AssertionError(f'EXPECTED={json.dumps(e, indent=2)}\n!=\nACTUAL={json.dumps(v, indent=2)}')
-
-
+            diff = deepdiff.DeepDiff(e,dict(v))
+            raise AssertionError(f'Diff=\n{diff.pretty()}\n')
