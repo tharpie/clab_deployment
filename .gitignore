@@ -5,6 +5,8 @@ __pycache__/
 
 # project based things to ignore
 *clab*
+*.html
+*.xml
 
 # C extensions
 *.so

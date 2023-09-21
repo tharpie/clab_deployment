@@ -1,63 +1,50 @@
 import sys
 import os
+import json
+import deepdiff
 sys.path.append(f'{os.getcwd()}/pylibs')
 import clab_inventory
 
 
-class InventoryHost(object):
-    def __init__(self, name):
-        self.name = name
-        self.ordered_groups = dict()
-        self.variables = dict()
-        self.merged_vars = dict()
-
-    def groups(self):
-        groups = list()
-        for k,v in sorted(self.ordered_groups.items()):
-            groups.append(v)
-        return(groups)  
-
 class InventoryHostLibrary(object):
-    """Test library for testing InventoryGroup logic.
+    """Test library for testing InventoryHost logic.
 
-    Interacts with InventoryGroup object using its method(s).
+    Interacts with InventoryHost object using its method(s).
     """
-
     def __init__(self):
-        self._group = None
+        self._host = None
 
-    def create_valid_group(self, name):
-        self._group = clab_inventory.InventoryGroup(name)
+    def create_valid_host(self, name):
+        self._host = clab_inventory.InventoryHost(name)
     
-    def create_invalid_group(self, name):
-        try:
-            self._group = clab_inventory.InventoryGroup(name)
-        except Exception as e:
-            return(str(e))
+    def set_group(self, group):
+        if type(group) == list:
+            self._host._add_groups(group)
         else:
-            raise AssertionError(f'creating a group with {name} should have caused an error but did not')
+            self._host._add_group(group)
 
-    def set_children(self, children):
-        for child in children.split():
-            self._group._add_child(child)
+    def set_variables(self, variables, var_type):
+        if var_type == 'file_name':
+            variables = os.path.realpath(f'{os.getcwd()}/{variables}')
+        self._host._load_variables(variables, var_type)
 
-    def set_hosts(self, hosts):
-        for host in hosts.split():
-            self._group._add_host(host)
+    def merge_variables(self, update_vars):
+        self._host._merge_vars(update_vars)
 
     def name_should_be(self, expected):
-        if self._group.name != expected:
-            raise AssertionError(f'{self._group.name} != {expected}')
+        if self._host.name != expected:
+            raise AssertionError(f'{self._host.name} != {expected}')
 
-    def children_should_be(self, expected):
-        children = ','.join(self._group.children())
-        if expected != children:
-            raise AssertionError(f'{expected} != {children}')
+    def groups_should_be(self, expected):
+        e = expected
+        g = self._host.groups()
+        if e != g:
+            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(g)}')
 
-    def hosts_should_be(self, expected):
-        hosts = ','.join(self._group.hosts())
-        if expected != hosts:
-            raise AssertionError(f'{expected} != {hosts}')
+    def variables_should_be(self, expected):
+        e = expected
+        v = self._host.variables
+        if e != v:
+            diff = deepdiff.DeepDiff(e,dict(v))
+            raise AssertionError(f'Diff=\n{diff.pretty()}\n')
 
-   
-    

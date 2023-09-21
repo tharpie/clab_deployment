@@ -51,13 +51,13 @@ class InventoryGroupLibrary(object):
     
     def children_should_be(self, expected):
         e = expected
-        c = sorted(list(self._group.children()))
+        c = self._group.children()
         if e != c:
             raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(c)}')
 
     def hosts_should_be(self, expected):
         e = expected
-        h = sorted(list(self._group.hosts()))
+        h = self._group.hosts()
         if e != h:
             raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(h)}')
 

@@ -1,0 +1,9 @@
+---
+
+interfaces:
+  eth1:
+    type: access
+  eth2:
+    type: routed
+  eth3:
+    type: cross_connect
