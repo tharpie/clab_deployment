@@ -48,3 +48,9 @@ class InventoryHostLibrary(object):
             diff = deepdiff.DeepDiff(e,dict(v))
             raise AssertionError(f'Diff=\n{diff.pretty()}\n')
 
+    def private_variables_should_be(self, expected):
+        e = expected
+        v = self._host._vars
+        if e != v:
+            diff = deepdiff.DeepDiff(e,dict(v))
+            raise AssertionError(f'Diff=\n{diff.pretty()}\n')

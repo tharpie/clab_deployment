@@ -6,22 +6,19 @@ cwd = os.getcwd()
 sys.path.append(f'{cwd}/pylibs')
 import clab_inventory
 
-inv = clab_inventory.Inventory(f'{cwd}/inventory/inventory.yml')
+inv = clab_inventory.Inventory(f'{cwd}/inventory/inventory.yml', 'file_name')
 inv.load()
 
 print()
 
-for k,v in inv.groups.items():
-  print(k, v.children, v.variables, v.hosts())
-  print(json.dumps(v.merged_vars, indent=2))
+for k,v in inv._groups.items():
+  print(k, v.children(), v.parent, v.hosts())
 
 print()
 
-for k,v in inv.hosts.items():
+for k,v in inv._hosts.items():
   print(k)
   print(v.groups())
-  print(v.ordered_groups)
-  print(json.dumps(v.merged_vars, indent=2))
 
 print()
 

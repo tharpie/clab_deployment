@@ -68,9 +68,13 @@ def load_variables(variables, var_type):
         if var_type == 'dict':
             _vars.update(variables)
         elif var_type == 'file_name':
-            with open(variables) as f:
-                v = yaml.safe_load(f)
-                _vars.update(v)
+            try:
+                with open(variables) as f:
+                    v = yaml.safe_load(f)
+                    _vars.update(v)
+            except Exception as e:
+                tb = traceback.format_exc()
+                pretty_exception(self.__name__, self.__init__.__name__, tb, e)
     
     return(_vars)
 
@@ -82,6 +86,7 @@ class InventoryGroup(object):
 
         self.set_children = set()
         self.set_hosts = set()
+        self.parent = None
         self.hosts = self._hosts
         self.children = self._children
         self.variables = dict()
@@ -92,27 +97,29 @@ class InventoryGroup(object):
 
     def _add_child(self, child):
         self.set_children.add(child)
-        return()
 
     def _add_children(self, children):
         for c in list(children):
             self._add_child(c)        
-        return()
 
     def _add_host(self, host):
         self.set_hosts.add(host)
-        return()
 
     def _add_hosts(self, hosts):
         for h in list(hosts):
             self._add_host(h)
-        return()
+
+    def _set_parent(self, parent):
+        self.parent = parent
 
     def _hosts(self):
         return(list(sorted(self.set_hosts)))
 
     def _children(self):
         return(list(sorted(self.set_children)))
+
+    def _parent(self):
+        return(list(sorted(self.set_parent)))
 
     def _load_variables(self, variables, var_type):
         self._vars = load_variables(variables, var_type)
@@ -122,7 +129,7 @@ class InventoryGroup(object):
         merged = merge_variables(self.variables, update)
         self.variables = merged
 
-    
+
 class InventoryHost(object):
     def __init__(self, name):
         self.name = name
@@ -157,68 +164,117 @@ class InventoryHost(object):
 
 
 class Inventory(object):
-    def __init__(self, inventory_fname):
-        self.inventory_fname = inventory_fname
-        self.groups = dict()
-        self.hosts = dict()
-        self.inventory_yaml = dict()
-        self.inventory_basedir = self.inventory_fname[:self.inventory_fname.rfind('/')]
-        self.ordered_groups = list()
-    
-    def load(self):        
-        self.__read_inventory_file()
-        self.__create_inventory_objects()
-        self.__load_variables()
-        self.__merge_group_vars()
-        self.__merge_host_vars()
+    def __init__(self, base, base_type):
+        self._vars = load_variables(base, base_type)
+        self._groups = dict()
+        self._hosts = dict()
+        self._head_group = ''
+        #self.inventory_basedir = self.inventory_fname[:self.inventory_fname.rfind('/')]
 
-    def __read_inventory_file(self):
-        try:
-            with open(self.inventory_fname) as f:
-                self.inventory_yaml.update(yaml.safe_load(f))
-        except Exception as e:
-            tb = traceback.format_exc()
-            pretty_exception(self.__name__, self.__init__.__name__, tb, e)
+    def groups(self):
+        groups = list()
+        for k,v in sorted(self._groups.items()):
+            groups.append(k)
+        return(groups)
 
-    def __create_inventory_objects(self, structure=None, groups={}, tier=0):
-        if structure == None:
-            structure = self.inventory_yaml
+    def hosts(self):
+        hosts = list()
+        for k,v in sorted(self._hosts.items()):
+            hosts.append(k)
+        return(hosts)
 
-        for k,v in structure.items():
+    def group(self, name):
+        return(self._groups[name])
+
+    def host(self, name):
+        return(self._hosts[name])
+
+    def _create_group_object(self, name, parent=None):
+        g = InventoryGroup(name)
+        if len(self._groups) == 0:
+            self._head_group = name
+            
+        self._groups[name] = g
+
+    def _create_host_object(self, name):
+        h = InventoryHost(name)
+        self._hosts[name] = h
+
+    def _get_group_parent_tree(self, group_name, groups=[]):
+        if group_name in self._groups.keys():
+            parent = self._groups[group_name].parent
+            if parent == None:
+                groups.append(group_name)
+            else:
+                self._get_group_parent_tree(parent, groups)
+        
+        return(sorted(groups, reverse=True))
+
+    def _create_inventory_objects(self, nested=None, parent=None):
+        if nested == None:
+            nested = self._vars
+
+        for k,v in nested.items():
             if type(v) == dict:
-                g = InventoryGroup(k)
-                self.groups[k] = g
+                self._create_group_object(k)
+                if k != self._head_group:
+                #if parent != None:
+                    self._groups[k]._set_parent(parent)
+                    self._groups[parent]._add_child(k)
 
                 if 'hostnames' in v.keys():
-                    parent_group = groups[tier-1]
-                    self.groups[parent_group].children.append(k)
-                    self.ordered_groups.append(k)
-                    
                     for host in v['hostnames']:
-                        h = InventoryHost(host)
-                        h.ordered_groups.update(groups)
-                        h.ordered_groups[tier] = k
-                        self.hosts[h.name] = h
-
-                        for order,group_name in sorted(h.ordered_groups.items()):
-                            self.groups[group_name].hashed_hosts[host] = None                
+                        self._create_host_object(host)
+                        groups = self._get_group_parent_tree(k)
+                        self._hosts[host]._add_groups(groups)
+                        for group in groups:
+                            self._groups[group]._add_host(host)
                 else:
-                    if tier > 0:
-                        parent_group = groups[tier-1]
-                        self.groups[parent_group].children.append(k)
-                    
-                    self.ordered_groups.append(k)
-                    _groups = copy.deepcopy(groups)
-                    _tier = copy.deepcopy(tier)
-                    _groups.update({tier:k})
-                    _tier += 1
-                    self.__create_inventory_objects(v, _groups, _tier)
-            
-            #try:
-            #    g
-            #except Exception as e:
-            #    tb = traceback.format_exc()
-            #    pretty_exception(self.__name__, self.__create_inventory_objects.__name__, tb, e)
+                    self._create_inventory_objects(v, k)
+
+
+    def load(self):
+        self._create_inventory_objects()
+
+    #def __create_inventory_objects(self, structure=None, groups={}, tier=0):
+    #    if structure == None:
+    #        structure = self.inventory_yaml
+
+    #    for k,v in structure.items():
+    #        if type(v) == dict:
+    #            g = InventoryGroup(k)
+    #            self.groups[k] = g
+
+    #            if 'hostnames' in v.keys():
+    #                parent_group = groups[tier-1]
+    #                self.groups[parent_group].children.append(k)
+    #                self.ordered_groups.append(k)
+    #                
+    #                for host in v['hostnames']:
+    #                    h = InventoryHost(host)
+    #                    h.ordered_groups.update(groups)
+    #                    h.ordered_groups[tier] = k
+    #                    self.hosts[h.name] = h
+
+    #                    for order,group_name in sorted(h.ordered_groups.items()):
+    #                        self.groups[group_name].hashed_hosts[host] = None                
+    #            else:
+    #                if tier > 0:
+    #                    parent_group = groups[tier-1]
+    #                    self.groups[parent_group].children.append(k)
+    #                
+    #                self.ordered_groups.append(k)
+    #                _groups = copy.deepcopy(groups)
+    #                _tier = copy.deepcopy(tier)
+    #                _groups.update({tier:k})
+    #                _tier += 1
+    #                self.__create_inventory_objects(v, _groups, _tier)
+    #        
+    #        #try:
+    #        #    g
+    #        #except Exception as e:
+    #        #    tb = traceback.format_exc()
+    #        #    pretty_exception(self.__name__, self.__create_inventory_objects.__name__, tb, e)
             
 
     def __load_variables(self):
