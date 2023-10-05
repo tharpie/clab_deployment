@@ -6,7 +6,7 @@ cwd = os.getcwd()
 sys.path.append(f'{cwd}/pylibs')
 import clab_inventory
 
-inv = clab_inventory.Inventory(f'{cwd}/inventory/inventory.yml', 'file_name')
+inv = clab_inventory.Inventory(f'{cwd}/inventory/inventory.yml', [f'{cwd}/inventory/groups', f'{cwd}/inventory/groups'], 'file_name', 'dir_list')
 inv.load()
 
 print()
@@ -22,8 +22,8 @@ for k,v in inv._hosts.items():
 
 print()
 
-for item in inv.ordered_groups:
-  print(item)
+for k,v in inv._groups_index.items():
+  print(k, v)
 
 
 print('#########################################')

@@ -6,9 +6,9 @@ import traceback
 import copy
 import keyword
 import json
-from robot.utils.dotdict import DotDict
 
-def pretty_execption(class_name, func_name, tb, e):
+
+def pretty_exception(class_name, func_name, tb, e):
     print(f'Exception caught:  in class={class_name} func={func_name}')
     print()
     print(' Traceback ')
@@ -19,9 +19,6 @@ def pretty_execption(class_name, func_name, tb, e):
     print()
     sys.exit(1)
 
-#raise Exception(f'{self.name} is in python keyword list or has invalid character or star')
-
-SUPPORTED_VAR_TYPES = ['dict', 'file_name', 'url']
 
 def is_name_valid(name):
     valid = True
@@ -43,8 +40,10 @@ def is_name_valid(name):
     return(valid)
 
 def merge_variables(orig, update=dict()):
-    variables = copy.deepcopy(orig)
+    if type(orig) != dict or type(update) != dict:
+        raise Exception(f'input for merge_variables needs two dicts orig={type(orig)} update={type(update)}')
 
+    variables = copy.deepcopy(orig)
     for u_k, u_v in update.items():
         if u_k not in orig.keys():
             variables.update({u_k:u_v})
@@ -60,27 +59,75 @@ def merge_variables(orig, update=dict()):
     
     return(variables)
 
-def load_variables(variables, var_type):
+def load_from_dict(d):
     _vars = dict()
-    if var_type not in SUPPORTED_VAR_TYPES:
-        raise Exception(f'{var_type} is not supported. Specify one of the following {str(SUPPORTED_VAR_TYPES)}')
-    else:
-        if var_type == 'dict':
-            _vars.update(variables)
-        elif var_type == 'file_name':
-            try:
-                with open(variables) as f:
-                    v = yaml.safe_load(f)
-                    _vars.update(v)
-            except Exception as e:
-                tb = traceback.format_exc()
-                pretty_exception(self.__name__, self.__init__.__name__, tb, e)
-    
+    if type(d) != dict:
+        raise Exception(f'input for load_from_dict type={type(d)}, please provide dict')
+    _vars.update(d)
     return(_vars)
+
+def load_from_file(fname):
+    _vars = dict()
+    if not os.path.exists(fname):
+        raise Exception(f'fname={fname} is not a valid path')
+    try:
+        with open(fname) as f:
+            _vars.update(yaml.safe_load(f))
+    except Exception as e:
+        tb = traceback.format_exc()
+        raise Exception(f'error in load_from_file reading={fname}', tb)
+    return(_vars)
+
+def load_from_file_list(flist):
+    _vars = dict()
+    if type(flist) != list:
+        raise Exception(f'input for load_from_file_list type={type(flist)}, please provide list')
+    for fname in flist:
+        _vars.update({label_from_fname(fname): load_from_file(fname)})
+    return(_vars)
+
+def load_from_url(uri):
+    _vars = dict()
+    return(_vars)
+
+def load_from_dir(d):
+    flist = list()
+    if not os.path.exists(d):
+        raise Exception(f'dir={d} is not a valid path')
+    for fname in os.listdir(d):
+        flist.append(f'{d}/{fname}')    
+    return(load_from_file_list(flist))
+
+def load_from_dir_list(dlist):
+    _vars = dict()
+    if type(dlist) != list:
+        raise Exception(f'input for load_from_dir_list type={type(dlist)}, please provide list')
+    for dirname in dlist:
+        _vars.update(load_from_dir(dirname))
+    return(_vars)
+
+def label_from_fname(fname):
+    slash_index = 0 if fname.rfind('/') == -1 else fname.rfind('/')
+    dot_index = fname.rfind('.')
+    if dot_index == -1:
+        label = fname[slash_index+1:]
+    else:
+        label = fname[slash_index+1:dot_index]
+    return(label)
+
+
+LOAD_FUNCTIONS = {
+    'dict': load_from_dict,
+    'file_name': load_from_file,
+    'file_list': load_from_file_list,
+    'dir': load_from_dir,
+    'dir_list': load_from_dir_list,
+    'url': load_from_url
+}
 
 class InventoryGroup(object):
     def __init__(self, name):
-        self.name = name
+        self.name = name.lower()
         if not self._is_valid():
             raise Exception(f'{name} has invalid InventoryGroup name')
 
@@ -121,18 +168,20 @@ class InventoryGroup(object):
     def _parent(self):
         return(list(sorted(self.set_parent)))
 
-    def _load_variables(self, variables, var_type):
-        self._vars = load_variables(variables, var_type)
-        self.variables = copy.deepcopy(self._vars)
+    def _load_variables(self, input, input_type):
+        if input_type not in LOAD_FUNCTIONS.keys():
+            raise Exception(f'{input_type} is not supported. Specify one of the following {str(LOAD_FUNCTIONS.keys())}')
+        else:
+            self._vars = LOAD_FUNCTIONS[input_type](input)
+            self.variables = copy.deepcopy(self._vars)
 
     def _merge_vars(self, update=dict()):
-        merged = merge_variables(self.variables, update)
-        self.variables = merged
+        self.variables = merge_variables(self.variables, update)
 
 
 class InventoryHost(object):
     def __init__(self, name):
-        self.name = name
+        self.name = name.lower()
         self.groups = self._groups
         self.ordered_groups = dict()
         self.variables = dict()
@@ -141,12 +190,10 @@ class InventoryHost(object):
     def _add_group(self, group_name):
         index = len(self.ordered_groups)
         self.ordered_groups[index] = group_name
-        return()
 
     def _add_groups(self, groups):
         for g in list(groups):
             self._add_group(g)
-        return()
 
     def _groups(self):
         groups = list()
@@ -154,47 +201,66 @@ class InventoryHost(object):
             groups.append(v)
         return(groups)  
 
-    def _load_variables(self, variables, var_type):
-        self._vars = load_variables(variables, var_type)
-        self.variables = copy.deepcopy(self._vars)
+    def _load_variables(self, input, input_type):
+        if input_type not in LOAD_FUNCTIONS.keys():
+            raise Exception(f'{input_type} is not supported. Specify one of the following {str(LOAD_FUNCTIONS.keys())}')
+        else:
+            self._vars = LOAD_FUNCTIONS[input_type](input)
+            self.variables = copy.deepcopy(self._vars)
 
     def _merge_vars(self, update=dict()):
-        merged = merge_variables(self.variables, update)
-        self.variables = merged
+        self.variables = merge_variables(self.variables, update)
 
 
 class Inventory(object):
-    def __init__(self, base, base_type):
-        self._vars = load_variables(base, base_type)
+    def __init__(self, label, inventory_input, input_type):
+        self.label = label
+        self.inventory_input = inventory_input
+        self.input_type = input_type
+        self._vars = dict()
+
+        try:
+            self._vars = LOAD_FUNCTIONS[input_type](inventory_input)
+        except Exception as e:
+            tb = traceback.format_exc()
+            pretty_exception('Inventory (class)', __name__, tb, e)
+
         self._groups = dict()
         self._hosts = dict()
-        self._head_group = ''
-        #self.inventory_basedir = self.inventory_fname[:self.inventory_fname.rfind('/')]
-
+        self._groups_index = dict()
+    
     def groups(self):
         groups = list()
-        for k,v in sorted(self._groups.items()):
+        for k,v in sorted(self._groups_index.items(), key=lambda x: x[1]):
             groups.append(k)
         return(groups)
+
+    def group(self, name):
+        return(self._groups[name])
+
+    def group_index(self, name):
+        return(self._groups_index[name])
 
     def hosts(self):
         hosts = list()
         for k,v in sorted(self._hosts.items()):
             hosts.append(k)
         return(hosts)
-
-    def group(self, name):
-        return(self._groups[name])
-
+    
     def host(self, name):
         return(self._hosts[name])
 
+    def load(self, vars_input, input_type):
+        self._create_inventory_objects()
+        self._load_variables(vars_input, input_type)
+        #self._merge_group_vars()
+        #self._merge_host_vars()
+
     def _create_group_object(self, name, parent=None):
         g = InventoryGroup(name)
-        if len(self._groups) == 0:
-            self._head_group = name
-            
+        index = len(self._groups)
         self._groups[name] = g
+        self._groups_index[name] = index
 
     def _create_host_object(self, name):
         h = InventoryHost(name)
@@ -206,8 +272,7 @@ class Inventory(object):
             if parent == None:
                 groups.append(group_name)
             else:
-                self._get_group_parent_tree(parent, groups)
-        
+                self._get_group_parent_tree(parent, groups)        
         return(sorted(groups, reverse=True))
 
     def _create_inventory_objects(self, nested=None, parent=None):
@@ -215,167 +280,85 @@ class Inventory(object):
             nested = self._vars
 
         for k,v in nested.items():
+            label = k.lower()
             if type(v) == dict:
-                self._create_group_object(k)
-                if k != self._head_group:
-                #if parent != None:
-                    self._groups[k]._set_parent(parent)
-                    self._groups[parent]._add_child(k)
+                self._create_group_object(label)
+                if self._groups_index[label] > 0:
+                    self._groups[label]._set_parent(parent)
+                    self._groups[parent]._add_child(label)
 
                 if 'hostnames' in v.keys():
                     for host in v['hostnames']:
-                        self._create_host_object(host)
-                        groups = self._get_group_parent_tree(k)
-                        self._hosts[host]._add_groups(groups)
+                        hostname = host.lower()
+                        self._create_host_object(hostname)
+                        groups = self._get_group_parent_tree(label)
+                        self._hosts[hostname]._add_groups(groups)
                         for group in groups:
-                            self._groups[group]._add_host(host)
+                            self._groups[group]._add_host(hostname)
                 else:
-                    self._create_inventory_objects(v, k)
-
-
-    def load(self):
-        self._create_inventory_objects()
-
-    #def __create_inventory_objects(self, structure=None, groups={}, tier=0):
-    #    if structure == None:
-    #        structure = self.inventory_yaml
-
-    #    for k,v in structure.items():
-    #        if type(v) == dict:
-    #            g = InventoryGroup(k)
-    #            self.groups[k] = g
-
-    #            if 'hostnames' in v.keys():
-    #                parent_group = groups[tier-1]
-    #                self.groups[parent_group].children.append(k)
-    #                self.ordered_groups.append(k)
-    #                
-    #                for host in v['hostnames']:
-    #                    h = InventoryHost(host)
-    #                    h.ordered_groups.update(groups)
-    #                    h.ordered_groups[tier] = k
-    #                    self.hosts[h.name] = h
-
-    #                    for order,group_name in sorted(h.ordered_groups.items()):
-    #                        self.groups[group_name].hashed_hosts[host] = None                
-    #            else:
-    #                if tier > 0:
-    #                    parent_group = groups[tier-1]
-    #                    self.groups[parent_group].children.append(k)
-    #                
-    #                self.ordered_groups.append(k)
-    #                _groups = copy.deepcopy(groups)
-    #                _tier = copy.deepcopy(tier)
-    #                _groups.update({tier:k})
-    #                _tier += 1
-    #                self.__create_inventory_objects(v, _groups, _tier)
-    #        
-    #        #try:
-    #        #    g
-    #        #except Exception as e:
-    #        #    tb = traceback.format_exc()
-    #        #    pretty_exception(self.__name__, self.__create_inventory_objects.__name__, tb, e)
-            
-
-    def __load_variables(self):
-        hosts_files = {}
-        for fname in os.listdir(f'{self.inventory_basedir}/hosts'):
-            if '.' in fname:
-                host = fname[:fname.rfind('.')]
-            else:
-                host = fname
-            
-            hosts_files[host] = fname
-
-        for k,v in self.hosts.items():
-            if k in hosts_files:
-                with open(f'{self.inventory_basedir}/hosts/{hosts_files[k]}') as y:
-                    yaml_vars = yaml.safe_load(y)
-
-                    if 'extra_groups' in yaml_vars.keys():
-                        extra_indices = [ i + len(self.hosts[k].ordered_groups.keys()) for i in range(0,len(yaml_vars['extra_groups']))]
-                        for group_name in yaml_vars['extra_groups']:
-                            g = InventoryGroup(group_name)
-                            g.hashed_hosts[k] = None
-                            self.groups[group_name] = g
-                            self.hosts[k].ordered_groups.update({extra_indices.pop(0):group_name})
-                
-                v.variables.update(yaml_vars)
-                v.merged_vars.update(yaml_vars)
-
-
-        group_files = {}
-        for fname in os.listdir(f'{self.inventory_basedir}/groups'):
-            if '.' in fname:
-                group = fname[:fname.rfind('.')]
-            else:
-                group = fname
-            
-            group_files[group] = fname
+                    self._create_inventory_objects(v, label)
         
-        for k,v in self.groups.items():
-            if k in group_files:
-                with open(f'{self.inventory_basedir}/groups/{group_files[k]}') as y:
-                    yaml_vars = yaml.safe_load(y)
-                    v.variables.update(yaml_vars)
-                    v.merged_vars.update(yaml_vars)
+    def _load_variables(self, vars_input, vars_type):
+        object_vars = LOAD_FUNCTIONS[vars_type](vars_input)
+
+        for h in self.hosts():
+            if h in self.object_vars.keys():
+                _vars = self.object_vars[h]
+                host_obj = self.host(h)
+                if 'extra_groups' in _vars.keys():
+                    for group_name in _vars['extra_groups']:
+                        self._create_group_object(group_name)
+                        host_obj._add_group(group_name)
+                host_obj._load_variables(_vars, 'dict')
+        
+        for g in self.groups():
+            if g in self.object_vars.keys():
+                _vars = self.object_vars[g]
+                group_obj = self.group(g)
+                group_obj._load_variables(_vars, 'dict')
     
+    def _merge_group_vars(self):
+        for group, index in sorted(self._groups_index.items(), key=lambda x: x[1]):
+        #for group_name in self.ordered_groups:
+            g = self._groups[group]
+            if g.parent != None:
+                g._merge_vars(self._groups[g.parent].variables)
 
-    def __merge_variables(self, orig, update=dict()):
-        variables = copy.deepcopy(orig)
+            #if len(g.children) > 0:
+            #    for c in g.children:
+            #        self._groups[c]._merge_vars()
+            #        g._merge_vars(self._groups[c].variables)
+            #        self.groups[c].merged_vars = child_merged_vars
+            #g.merged_vars = merged_vars
 
-        for u_k, u_v in update.items():
-            if u_k not in orig.keys():
-                variables.update({u_k:u_v})
-            else:
-                if type(u_v) == str:
-                    variables[u_k] = u_v
-                elif type(u_v) == list:
-                    for item in u_v:
-                        if item not in variables[u_k]:
-                            variables[u_k].append(item)
-                elif type(u_v) == dict:
-                    self.__merge_variables(variables, u_v)
-
-        return(variables)
-
-    def __merge_group_vars(self):
-        for group_name in self.ordered_groups:
-            g = self.groups[group_name]
-            merged_vars = copy.deepcopy(g.merged_vars)
-
-            if len(g.children) > 0:
-                for c in g.children:
-                    child_merged_vars = self.__merge_variables(merged_vars, copy.deepcopy(self.groups[c].merged_vars))
-                    self.groups[c].merged_vars = child_merged_vars
-
-            g.merged_vars = merged_vars
-
-    def __merge_host_vars(self):
-        for k,v in self.hosts.items():
-            groups = v.groups()
-            host_vars = dict()
+    def _merge_host_vars(self):
+        for name, host in self._hosts.items():
+        #for k,v in self.hosts.items():
+            groups = host.groups()
+            #host_vars = dict()
             for g in groups:
-                host_vars.update(self.__merge_variables(host_vars, copy.deepcopy(self.groups[g].merged_vars)))
+                host._merge_vars(self._groups[g].variables)
+
+                #host_vars.update(self.__merge_variables(host_vars, copy.deepcopy(self.groups[g].merged_vars)))
                 
-            host_vars.update(self.__merge_variables(copy.deepcopy(v.merged_vars), copy.deepcopy(self.groups[g].merged_vars)))
-            v.merged_vars = host_vars
+            #host_vars.update(self.__merge_variables(copy.deepcopy(v.merged_vars), copy.deepcopy(self.groups[g].merged_vars)))
+            #v.merged_vars = host_vars
 
     def ansible_inventory(self):
         ansible_vars = dict()
         ansible_vars['_meta'] = dict()
         ansible_vars['_meta']['hostvars'] = dict()
  
-        for k,v in self.groups.items():
+        for k,v in self._groups.items():
             group = dict()
-            group.update({'children': v.children})
-            group.update({'vars': v.merged_vars})
+            group.update({'children': v.children()})
+            group.update({'vars': v.variables})
             group.update({'hosts': v.hosts()})
             ansible_vars.update({k:group})
 
-        for k,v in self.hosts.items():
+        for k,v in self._hosts.items():
             host = dict()
-            host.update(v.merged_vars)
+            host.update(v.variables)
             ansible_vars['_meta']['hostvars'].update({k:host})
 
         return(ansible_vars)

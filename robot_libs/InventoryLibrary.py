@@ -14,43 +14,54 @@ class InventoryLibrary(object):
     def __init__(self):
         self._inventory = None
 
-    def create_valid_inventory(self, base, base_type):
-        self._inventory = clab_inventory.Inventory(base, base_type)
+    def create_valid_inventory(self, base, object_vars, vars_type, object_vars_type=None):
+        self._inventory = clab_inventory.Inventory(base, object_vars, vars_type, object_vars_type)
     
     def merge_variables(self, update_vars):
         self._inventory._merge_vars(update_vars)
 
-    def load_inventory(self):
-        self._inventory.load()
+    def create_inventory_objects(self):
+        self._inventory._create_inventory_objects()
+
+    def load_merge_variables(self):
+        self._inventory._load_merge_variables()
+
+    def host_variables_should_be(self, hostname, expected):
+        e = expected
+        h = self._inventory.group(hostname).variables
+        self.expectation(h, e)
 
     def groups_should_be(self, expected):
         e = expected
         g = self._inventory.groups()
-        if e != g:
-            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(g)}')
+        self.expectation(g, e)
 
     def hosts_should_be(self, expected):
         e = expected
         h = self._inventory.hosts()
-        if e != h:
-            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(h)}')
+        self.expectation(h, e)
 
     def children_should_be(self, parent_name, expected):
         e = expected
         c = self._inventory.group(parent_name).children()
-        if e != c:
-            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(c)}')
+        self.expectation(c, e)
 
     def parent_should_be(self, group_name, expected):
         e = expected
         p = self._inventory.group(group_name).parent
-        if e != p:
-            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(p)}')
+        self.expectation(p, e)
 
     def private_variables_should_be(self, expected):
         e = expected
         v = self._inventory._vars
-        if e != v:
-            diff = deepdiff.DeepDiff(e,dict(v))
-            raise AssertionError(f'Diff=\n{diff.pretty()}\n')
+        self.expectation(v, e)
 
+    def private_object_variables_should_be(self, expected):
+        e = expected
+        v = self._inventory._object_vars
+        self.expectation(v, e)
+
+    def expectation(self, a, e):
+        if e != a:
+            diff = deepdiff.DeepDiff(a, e, verbose_level=2)
+            raise AssertionError(f'Diff=\n{diff.pretty()}\n')

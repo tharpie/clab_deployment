@@ -37,34 +37,31 @@ class InventoryGroupLibrary(object):
         else:
             self._group._add_host(host)
 
-    def name_should_be(self, expected):
-        if self._group.name != expected:
-            raise AssertionError(f'{self._group.name} != {expected}')
-
-    def set_variables(self, variables, var_type):
-        if var_type == 'file_name':
-            variables = os.path.realpath(f'{os.getcwd()}/{variables}')
-        self._group._load_variables(variables, var_type)
+    def set_variables(self, input, input_type):
+        self._group._load_variables(input, input_type)
 
     def merge_variables(self, update_vars):
         self._group._merge_vars(update_vars)
-    
+
+    def name_should_be(self, expected):
+        self.expectation(self._group.name, expected)
+
     def children_should_be(self, expected):
         e = expected
         c = self._group.children()
-        if e != c:
-            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(c)}')
+        self.expectation(c, e)
 
     def hosts_should_be(self, expected):
         e = expected
         h = self._group.hosts()
-        if e != h:
-            raise AssertionError(f'EXPECTED={str(e)}\n!=\nACTUAL={str(h)}')
+        self.expectation(h, e)
 
     def variables_should_be(self, expected):
         e = expected
         v = self._group.variables
-        if e != v:
-            diff = deepdiff.DeepDiff(e,dict(v))
-            raise AssertionError(f'Diff=\n{diff.pretty()}\n')
+        self.expectation(v, e)
 
+    def expectation(self, a, e):
+        if e != a:
+            diff = deepdiff.DeepDiff(a, e, verbose_level=2)
+            raise AssertionError(f'Diff=\n{diff.pretty()}\n')
